@@ -1,5 +1,28 @@
-import {defineType, defineField} from 'sanity'
+import {defineType, defineField, defineArrayMember} from 'sanity'
 import {plainTextPreview} from './richTextPreview'
+
+// Paragraph-only Portable Text (bold / italic / links) — rendered by the frontend <RichText> component.
+const simpleRichText = [
+  defineArrayMember({
+    type: 'block',
+    styles: [{title: 'Normal', value: 'normal'}],
+    lists: [],
+    marks: {
+      decorators: [
+        {title: 'Bold', value: 'strong'},
+        {title: 'Italic', value: 'em'},
+      ],
+      annotations: [
+        {
+          name: 'link',
+          title: 'Link',
+          type: 'object',
+          fields: [{name: 'href', title: 'URL', type: 'url', validation: (Rule) => Rule.uri({allowRelative: true, scheme: ['http', 'https', 'mailto', 'tel']})}],
+        },
+      ],
+    },
+  }),
+]
 
 export default defineType({
   name: 'eachTreatment',
@@ -324,6 +347,170 @@ export default defineType({
       title: 'Quote — Attribution',
       description:
         'Name and title shown below the quote (e.g. "— Dr. Satish Reddy, Orthopaedic & Joint Replacement Surgeon")',
+      type: 'string',
+    }),
+
+    // ══════════════════════════════════════════════════════
+    //   COST SECTION
+    //   (cost table, factors, insurance box, doctor consult card — shown above FAQs)
+    // ══════════════════════════════════════════════════════
+    defineField({
+      name: 'costDivider',
+      title: '━━━━━━━━  COST SECTION  ━━━━━━━━',
+      description:
+        'Cost section shown above the FAQs — intro, cost table, note, cost factors, insurance box, and doctor consult card. Leave the heading empty to hide the section.',
+      type: 'string',
+      readOnly: true,
+      initialValue: '',
+      components: {input: () => null},
+    }),
+    defineField({
+      name: 'costHeading',
+      title: 'Cost — Section Heading',
+      description: 'e.g. "Knee Replacement Cost in Hyderabad"',
+      type: 'string',
+    }),
+    defineField({
+      name: 'costIntro',
+      title: 'Cost — Intro Paragraph',
+      description: 'Paragraph shown below the heading.',
+      type: 'array',
+      of: simpleRichText,
+    }),
+    defineField({
+      name: 'costTable',
+      title: 'Cost — Table Rows',
+      description: 'Each row is one procedure and its approximate cost range.',
+      type: 'array',
+      of: [
+        defineArrayMember({
+          type: 'object',
+          fields: [
+            defineField({
+              name: 'procedure',
+              title: 'Procedure',
+              description: 'e.g. "Total Knee Replacement (one knee)"',
+              type: 'string',
+            }),
+            defineField({
+              name: 'range',
+              title: 'Approximate Cost Range',
+              description: 'e.g. "₹2,00,000 – ₹3,50,000"',
+              type: 'string',
+            }),
+          ],
+          preview: {
+            select: {title: 'procedure', subtitle: 'range'},
+          },
+        }),
+      ],
+    }),
+    defineField({
+      name: 'costNote',
+      title: 'Cost — Note (blue box)',
+      description:
+        'Optional note shown below the table (e.g. "Costs are indicative and vary based on…")',
+      type: 'array',
+      of: simpleRichText,
+    }),
+
+    // ── Factors that influence cost ──────
+    defineField({
+      name: 'costFactorsHeading',
+      title: 'Cost Factors — Heading',
+      description:
+        'Optional. Leave empty to use "Factors That Influence [Treatment Title] Cost".',
+      type: 'string',
+    }),
+    defineField({
+      name: 'costFactorsSubtext',
+      title: 'Cost Factors — Subtext',
+      description:
+        'Optional. Leave empty to use "How the procedure and its requirements affect the cost:"',
+      type: 'string',
+    }),
+    defineField({
+      name: 'costFactors',
+      title: 'Cost Factors — Bullet Points',
+      description: 'Each item is one arrow bullet point. Use bold for the factor name.',
+      type: 'array',
+      of: [
+        defineArrayMember({
+          type: 'object',
+          name: 'costFactor',
+          fields: [
+            defineField({
+              name: 'text',
+              title: 'Text',
+              type: 'array',
+              of: simpleRichText,
+            }),
+          ],
+          preview: {
+            select: {blocks: 'text'},
+            prepare({blocks}) {
+              const block = (blocks || []).find((b: {_type: string}) => b._type === 'block')
+              const title = block?.children?.map((child: {text?: string}) => child.text).join('')
+              return {title: title || 'Empty factor'}
+            },
+          },
+        }),
+      ],
+    }),
+
+    // ── Insurance box ──────
+    defineField({
+      name: 'costInsuranceHeading',
+      title: 'Insurance — Heading',
+      description: 'e.g. "Insurance Coverage"',
+      type: 'string',
+    }),
+    defineField({
+      name: 'costInsuranceIntro',
+      title: 'Insurance — Intro Paragraph',
+      type: 'array',
+      of: simpleRichText,
+    }),
+    defineField({
+      name: 'costInsuranceChecklistLabel',
+      title: 'Insurance — Checklist Label',
+      description:
+        'Optional. Leave empty to use "Our insurance support team can assist you with:"',
+      type: 'string',
+    }),
+    defineField({
+      name: 'costInsuranceChecklist',
+      title: 'Insurance — Checklist Items',
+      description: 'Each item is one checkmark bullet (e.g. "Cashless pre-authorisation").',
+      type: 'array',
+      of: [{type: 'string'}],
+    }),
+
+    // ── Doctor consult card ──────
+    defineField({
+      name: 'costConsultBio',
+      title: 'Consult Card — Text',
+      description:
+        'Optional. Leave empty to use the default "During consultation, [Doctor] will evaluate…" text.',
+      type: 'text',
+      rows: 3,
+    }),
+    defineField({
+      name: 'costConsultCtaLabel',
+      title: 'Consult Card — Button Label',
+      description: 'Optional. Defaults to "Consult Now".',
+      type: 'string',
+    }),
+    defineField({
+      name: 'costWhatsappHref',
+      title: 'Consult Card — WhatsApp Link (desktop)',
+      description: 'Optional. Defaults to the site WhatsApp link.',
+      type: 'url',
+    }),
+    defineField({
+      name: 'costPhoneHref',
+      title: 'Consult Card — Phone Link (mobile)',
+      description: 'Optional. Defaults to tel:07969084429',
       type: 'string',
     }),
 
